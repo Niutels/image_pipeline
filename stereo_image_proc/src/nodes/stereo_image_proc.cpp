@@ -35,6 +35,15 @@
 #include <ros/ros.h>
 #include <nodelet/loader.h>
 #include <image_proc/advertisement_checker.h>
+#include <tf/transform_listener.h>
+#include <sensor_msgs/JointState.h>
+#include <vector>
+#include <image_transport/image_transport.h>
+#include <sensor_msgs/CameraInfo.h>
+#include <sstream>
+#include <iostream>
+#include <typeinfo>
+#include <sensor_msgs/SetCameraInfo.h>
 
 void loadMonocularNodelets(nodelet::Loader& manager, const std::string& side,
                            const XmlRpc::XmlRpcValue& rectify_params,
@@ -80,9 +89,70 @@ void loadMonocularNodelets(nodelet::Loader& manager, const std::string& side,
   manager.load(rectify_color_name, "image_proc/rectify", remappings, my_argv);
 }
 
+float TRY = 0;
+float TLY = 0;
+float TP = 0;
+sensor_msgs::CameraInfo info_left;
+sensor_msgs::CameraInfo info_right;
+
+void callback(const sensor_msgs::JointState & msg)
+{
+TRY = msg.position[22];
+TLY = msg.position[21];
+TP = msg.position[23];
+} 
+
+void cb_left_camera_inf(const sensor_msgs::CameraInfo::ConstPtr& msg)
+{
+info_left = (*msg);
+info_left.R[0]=cos(TP)*cos(TLY);
+info_left.R[1]=-sin(TP);
+info_left.R[2]=cos(TP)*sin(TLY);
+info_left.R[3]=sin(TP)*cos(TLY);
+info_left.R[4]=cos(TP);
+info_left.R[5]=sin(TP)*sin(TLY);
+info_left.R[6]=-sin(TLY);
+info_left.R[7]=0;
+info_left.R[8]=cos(TLY);
+
+info_left.D[0] = 0.1;
+info_left.D[1] = 0.1;
+
+}
+
+void cb_right_camera_inf(const sensor_msgs::CameraInfo::ConstPtr& msg)
+{
+info_right = (*msg);
+info_right.R[0]=cos(TP)*cos(TRY);
+info_right.R[1]=-sin(TP);
+info_right.R[2]=cos(TP)*sin(TRY);
+info_right.R[3]=sin(TP)*cos(TRY);
+info_right.R[4]=cos(TP);
+info_right.R[5]=sin(TP)*sin(TRY);
+info_right.R[6]=-sin(TRY);
+info_right.R[7]=0;
+info_right.R[8]=cos(TRY);
+info_right.P[3]=-info_right.P[0]*0.106;
+info_right.P[7]=-0.000058;
+
+info_right.D[0] = 0.1;
+info_right.D[1] = 0.1;
+}
+
 int main(int argc, char **argv)
 {
+
   ros::init(argc, argv, "stereo_image_proc");
+  ros::NodeHandle node;
+    ros::NodeHandle nh;
+
+  ros::Publisher pub_info_left = nh.advertise<sensor_msgs::CameraInfo>("left/camera_info", 1);
+  ros::Publisher pub_info_right = nh.advertise<sensor_msgs::CameraInfo>("right/camera_info", 1);
+  ros::Subscriber sb_left_camera_inf = node.subscribe("/stereo/left/camera_inf", 1, cb_left_camera_inf);
+  ros::Subscriber sb_right_camera_inf = node.subscribe("/stereo/right/camera_inf", 1, cb_right_camera_inf);
+  ros::Subscriber sub = node.subscribe ("/joint_states", 1, callback); 
+
+  ros::NodeHandle private_nh("~");
 
   // Check for common user errors
   if (ros::names::remap("camera") != "camera")
@@ -100,8 +170,7 @@ int main(int argc, char **argv)
   }
 
   // Shared parameters to be propagated to nodelet private namespaces
-  ros::NodeHandle private_nh("~");
-  XmlRpc::XmlRpcValue shared_params;
+    XmlRpc::XmlRpcValue shared_params;
   int queue_size;
   if (private_nh.getParam("queue_size", queue_size))
     shared_params["queue_size"] = queue_size;
@@ -126,7 +195,6 @@ int main(int argc, char **argv)
   // dynamic_reconfigure so far, and this makes us backwards-compatible with cturtle.
   std::string disparity_name = ros::this_node::getName();
   manager.load(disparity_name, "stereo_image_proc/disparity", remappings, my_argv);
-
   // PointCloud2 nodelet
   // Inputs: left/image_rect_color, left/camera_info, right/camera_info, disparity
   // Outputs: points2
@@ -144,6 +212,15 @@ int main(int argc, char **argv)
   image_proc::AdvertisementChecker check_inputs(ros::NodeHandle(), ros::this_node::getName());
   check_inputs.start(topics, 60.0);
 
-  ros::spin();
+  ros::Rate r(10);
+  while(ros::ok())
+{   
+  pub_info_left.publish(info_left);  
+  pub_info_right.publish(info_right);  
+
+  ros::spinOnce();
+  r.sleep();  
+}
+
   return 0;
 }

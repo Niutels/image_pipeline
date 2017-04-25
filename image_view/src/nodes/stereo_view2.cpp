@@ -37,6 +37,9 @@
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
+#include <sensor_msgs/CameraInfo.h>
+#include <sensor_msgs/JointState.h>
+
 #include <stereo_msgs/DisparityImage.h>
 #include <cv_bridge/cv_bridge.h>
 
@@ -64,6 +67,13 @@ static void destroy(GtkWidget *widget, gpointer data)
 namespace enc = sensor_msgs::image_encodings;
 
 // colormap for disparities, RGB
+float TRY = 0;
+float TLY = 0;
+float TP = 0;
+sensor_msgs::CameraInfo info_left;
+sensor_msgs::CameraInfo info_right;
+ros::Publisher pub_info_left;
+ros::Publisher pub_info_right;
 static unsigned char colormap[768] = 
   { 150, 150, 150,
     107, 0, 12,
@@ -331,7 +341,7 @@ inline void increment(int* value)
 using namespace sensor_msgs;
 using namespace stereo_msgs;
 using namespace message_filters::sync_policies;
-
+using namespace std;
 // Note: StereoView is NOT nodelet-based, as it synchronizes the three streams.
 class StereoView
 {
@@ -366,7 +376,9 @@ public:
     ros::NodeHandle local_nh("~");
     bool autosize;
     local_nh.param("autosize", autosize, true);
-    
+  //     pub_info_left.publish(info_left);  
+  // pub_info_right.publish(info_right);  
+
     std::string format_string;
     local_nh.param("filename_format", format_string, std::string("%s%04i.jpg"));
     filename_format_.parse(format_string);
@@ -552,9 +564,70 @@ public:
   }
 };
 
+void callback(const sensor_msgs::JointState & msg)
+{
+TRY = msg.position[22];
+TLY = msg.position[21];
+TP = msg.position[23];
+
+// std::cout<< TRY << TLY <<std::endl; //22R 23L
+} 
+
+void cb_left_camera_inf(const sensor_msgs::CameraInfo::ConstPtr& msg)
+{
+//sensor_msgs::CameraInfo msg_copy;
+info_left = (*msg);
+info_left.R[0]=cos(TP)*cos(TLY);
+info_left.R[1]=-sin(TP);
+info_left.R[2]=cos(TP)*sin(TLY);
+info_left.R[3]=sin(TP)*cos(TLY);
+info_left.R[4]=cos(TP);
+info_left.R[5]=sin(TP)*sin(TLY);
+info_left.R[6]=-sin(TLY);
+info_left.R[7]=0;
+info_left.R[8]=cos(TLY);
+info_left.P[3]=0;
+info_left.P[7]=0;
+// info_left.R[0]=1;//cos(TP)*cos(TLY);
+// info_left.R[1]=0;//-sin(TP);
+// info_left.R[2]=0;//cos(TP)*sin(TLY);
+// info_left.R[3]=0;//sin(TP)*cos(TLY);
+// info_left.R[4]=1;//cos(TP);
+// info_left.R[5]=0;//sin(TP)*sin(TLY);
+// info_left.R[6]=0;//-sin(TLY);
+// info_left.R[7]=0;
+// info_left.R[8]=1;//cos(TLY);
+}
+
+// std::vector<double> Rr = [];
+// std::vector<double> Rl = [];
+
+void cb_right_camera_inf(const sensor_msgs::CameraInfo::ConstPtr& msg)
+{
+info_right = (*msg);
+info_right.R[0]=cos(TP)*cos(TRY);
+info_right.R[1]=-sin(TP);
+info_right.R[2]=cos(TP)*sin(TRY);
+info_right.R[3]=sin(TP)*cos(TRY);
+info_right.R[4]=cos(TP);
+info_right.R[5]=sin(TP)*sin(TRY);
+info_right.R[6]=-sin(TRY);
+info_right.R[7]=0;
+info_right.R[8]=cos(TRY);
+info_right.P[3]=-info_right.P[0]*0.106;
+info_right.P[7]=0;
+// info_right.R[0]=1;//cos(TP)*cos(TRY);
+// info_right.R[1]=0;//-sin(TP);
+// info_right.R[2]=0;//cos(TP)*sin(TRY);
+// info_right.R[3]=0;//sin(TP)*cos(TRY);
+// info_right.R[4]=1;//cos(TP);
+// info_right.R[5]=0;//sin(TP)*sin(TRY);
+// info_right.R[6]=0;//-sin(TRY);
+// info_right.R[7]=0;
+// info_right.R[8]=1;//cos(TRY);
+}
 int main(int argc, char **argv)
 {
-  int a;
   ros::init(argc, argv, "stereo_view", ros::init_options::AnonymousName);
   if (ros::names::remap("stereo") == "stereo") {
     ROS_WARN("'stereo' has not been remapped! Example command-line usage:\n"
@@ -565,10 +638,24 @@ int main(int argc, char **argv)
              "when stereo_image_proc publishes the computed point cloud. stereo_view "
              "may fail to synchronize these topics without a large queue_size.");
   }
-
+  ros::NodeHandle node;
+  ros::NodeHandle nh;
   std::string transport = argc > 1 ? argv[1] : "raw";
+  ros::Subscriber sb_left_camera_inf = node.subscribe("/stereo/left/camera_inf", 1, cb_left_camera_inf);
+  ros::Subscriber sb_right_camera_inf = node.subscribe("/stereo/right/camera_inf", 1, cb_right_camera_inf);
+  pub_info_left = nh.advertise<sensor_msgs::CameraInfo>("stereo/left/camera_info", 1);
+  pub_info_right = nh.advertise<sensor_msgs::CameraInfo>("stereo/right/camera_info", 1);
+  ros::Subscriber sub = node.subscribe ("/joint_states", 1, callback); 
   StereoView view(transport);
-  
+  ros::Rate r(10);
+  while(ros::ok())
+{   
+  pub_info_left.publish(info_left);  
+  pub_info_right.publish(info_right);  
+
+  ros::spinOnce();
+  r.sleep();  
+}
   ros::spin();
   return 0;
 }

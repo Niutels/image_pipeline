@@ -32,9 +32,9 @@ install(FILES nodelet_plugins.xml
 )
 
 # Standalone node
-add_executable(stereoimageproc_exe src/nodes/stereo_image_proc.cpp)
-
-target_link_libraries(stereoimageproc_exe stereo_image_proc ${catkin_LIBRARIES})
+#add_executable(stereoimageproc_exe src/nodes/stereo_image_proc.cpp)
+add_executable(stereoimageproc_exe src/nodes/stereoimageproc.cpp) 
+target_link_libraries(stereoimageproc_exe stereo_image_proc tf)
 SET_TARGET_PROPERTIES(stereoimageproc_exe PROPERTIES OUTPUT_NAME stereo_image_proc)
 install(TARGETS stereoimageproc_exe
         DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

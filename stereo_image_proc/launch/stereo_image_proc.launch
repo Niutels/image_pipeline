@@ -33,4 +33,8 @@
   <node pkg="nodelet" type="nodelet" name="point_cloud2"
         args="load stereo_image_proc/point_cloud2 $(arg manager) $(arg bond)"
 	respawn="$(arg respawn)" />
+  <param name="robot_description" textfile="$(find trikey_dreamer)/robots/dreamer_ltw.urdf" /> 
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher" />  
+  <node pkg="learning_tf" type="stereo_image_proc"
+        name="listener" />
 </launch>

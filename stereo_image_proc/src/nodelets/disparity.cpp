@@ -161,9 +161,9 @@ void DisparityNodelet::connectCb()
     /// @todo Allow remapping left, right?
     image_transport::TransportHints hints("raw", ros::TransportHints(), getPrivateNodeHandle());
     sub_l_image_.subscribe(*it_, "left/image_rect", 1, hints);
-    sub_l_info_ .subscribe(nh,   "left/camera_info", 1);
+    sub_l_info_ .subscribe(nh,   "left/camera_info", 1); //CAMERA_INFOS
     sub_r_image_.subscribe(*it_, "right/image_rect", 1, hints);
-    sub_r_info_ .subscribe(nh,   "right/camera_info", 1);
+    sub_r_info_ .subscribe(nh,   "right/camera_info", 1); //CAMERA_INFOS
   }
 }
 
@@ -233,6 +233,7 @@ void DisparityNodelet::configCb(Config &config, uint32_t level)
     block_matcher_.setStereoType(StereoProcessor::BM);
     block_matcher_.setPreFilterSize(config.prefilter_size);
     block_matcher_.setTextureThreshold(config.texture_threshold);
+    std::cout<<" Stereo BM"<<std::endl;
   }
   else if (config.stereo_algorithm == stereo_image_proc::Disparity_StereoSGBM) { // StereoSGBM
     block_matcher_.setStereoType(StereoProcessor::SGBM);
@@ -240,10 +241,10 @@ void DisparityNodelet::configCb(Config &config, uint32_t level)
     block_matcher_.setP1(config.P1);
     block_matcher_.setP2(config.P2);
     block_matcher_.setDisp12MaxDiff(config.disp12MaxDiff);
+    std::cout<<" Stereo SGBM"<<std::endl;
   }
 }
-
-} // namespace stereo_image_proc
+} 
 
 // Register nodelet
 #include <pluginlib/class_list_macros.h>

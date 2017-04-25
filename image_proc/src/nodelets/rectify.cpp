@@ -43,9 +43,11 @@
 #include <cv_bridge/cv_bridge.h>
 #include <dynamic_reconfigure/server.h>
 #include <image_proc/RectifyConfig.h>
+// sensor_msgs::CameraInfo info_left;
+// sensor_msgs::CameraInfo info_right;
+// sensor_msgs::CameraInfo info_neutre;
 
 namespace image_proc {
-
 class RectifyNodelet : public nodelet::Nodelet
 {
   // ROS communication
@@ -113,7 +115,7 @@ void RectifyNodelet::connectCb()
 void RectifyNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg,
                              const sensor_msgs::CameraInfoConstPtr& info_msg)
 {
-  // Verify camera is actually calibrated
+    // Verify camera is actually calibrated
   if (info_msg->K[0] == 0.0) {
     NODELET_ERROR_THROTTLE(30, "Rectified topic '%s' requested but camera publishing '%s' "
                            "is uncalibrated", pub_rect_.getTopic().c_str(),
@@ -163,8 +165,7 @@ void RectifyNodelet::configCb(Config &config, uint32_t level)
   config_ = config;
 }
 
-} // namespace image_proc
-
+}
 // Register nodelet
 #include <pluginlib/class_list_macros.h>
 PLUGINLIB_EXPORT_CLASS( image_proc::RectifyNodelet, nodelet::Nodelet)

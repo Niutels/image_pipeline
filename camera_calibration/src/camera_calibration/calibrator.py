@@ -47,8 +47,15 @@ import sensor_msgs.msg
 import tarfile
 import time
 from distutils.version import LooseVersion
+import rospy
+from std_msgs.msg import String
+from sensor_msgs import JointState
 
+def callback(data):
 
+def listener():
+    rospy.init_node('listener',anonymous=True)
+    rospy.Subscriber("/joint_states",String,callback)
 # Supported calibration patterns
 class Patterns:
     Chessboard, Circles, ACircles = list(range(3))
